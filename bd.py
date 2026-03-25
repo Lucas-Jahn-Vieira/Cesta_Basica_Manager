@@ -132,4 +132,5 @@ def inserir(tabela_escolhida, informacao:list[dict]):
 def atualizar_db():
     df = pd.read_sql("SELECT * FROM ipca", engine)
 
+
     df.to_excel('cesta_basica.xlsx', index=False)
