@@ -16,9 +16,9 @@ df = pd.read_excel('cesta_basica.xlsx')
 print('\n \n ') #adiciona espaços pra diferenciar o log do banco de dados com os prints do programa
 
 df.sort_values(by='valor', ascending=False)
-cesta_mais_cara = df.iloc[0]
-cesta_mais_barata = df.iloc[-1]
+IPCA_maior = df.iloc[0]
+IPCA_menor = df.iloc[-1]
 
-print(f'mais cara: {cesta_mais_cara} \n\nMais barata: {cesta_mais_barata}')
+print(f'mais cara: {IPCA_maior} \n\nMais barata: {IPCA_menor}')
 
 #adicionar lógica de scrapping para pegar os itens dessas cestas
