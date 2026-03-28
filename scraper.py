@@ -1,13 +1,16 @@
 import scrapy
 from scrapy.crawler import CrawlerProcess
-import w3lib.html
-import requests
-import pandas
+import os
+import re
 
+def clear_previous_json():
+        if os.path.exists('produtos.json'):
+            os.remove('produtos.json')
 
 #CONFIGURANDO O SCRAPPER ------------------------------------------------
 class CestaBasicaSpider(scrapy.Spider):
     name = "cesta_basica"
+    produto_volume = {'arroz':5, 'feijao':2, 'oleo_de_soja':0.9, 'acucar':1, 'cafe':0.5}
     start_urls = [
         #lista de urls do site do giassi
         "https://www.giassi.com.br/sitemap.xml",
@@ -32,50 +35,96 @@ class CestaBasicaSpider(scrapy.Spider):
 
     #"REAL" LÓGICA DO SCRAPPER -----------------------------------------------------------------------
 
+    #pega todas as sitelists de produtos
     def parse(self, response: scrapy.http.Response):
         response.selector.remove_namespaces()
 
         lista_sites = response.xpath('.//sitemap/loc[contains(text(), "/product")]/text()').getall()
 
-        for site in lista_sites[:3]:
+        for site in lista_sites[:1]:
             nome_site = site.split("/")[-1]
             print(f'Visitando site: {nome_site}')
             if site != None:
                 yield response.follow(site, self.parse_site)
 
+    #parse dos itens dentro das sitelists
     def parse_site(self, response: scrapy.http.Response):
         response.selector.remove_namespaces()
 
-        products_to_search = ['arroz', 'feijão']
-        for product in products_to_search:
-            product_list = response.xpath(f'//url/loc[contains(text(), "/{product}")]/text()').getall()
+        for produto in self.produto_volume.keys():
+            lista_produtos = response.xpath(f'//url/loc[contains(text(), "/{produto}")]/text()').getall()
 
-            for p in product_list:
+            for p in lista_produtos:
                 if p != None:
-                    nome_produto = p#.split('/')[-2]
-                    print(f'Visitando produto -> {nome_produto}')
+                    site_produto = p
+                    print(f'Visitando produto -> {site_produto}')
                     yield response.follow(p, self.get_product_info)
+                else:
+                    print(f'{produto} não foi encontrado')
 
+    #pega nome, preço, peso, etc dos produtos encotrados
     def get_product_info(self, response: scrapy.http.Response):
         response.selector.remove_namespaces()
 
         nome = response.css('span.vtex-store-components-3-x-productBrand::text').get()
-        preco = response.xpath('//meta[contains(@property, "product:price:amount")]/@content').get()
+        preco_total = response.xpath('//meta[contains(@property, "product:price:amount")]/@content').get()
+        
+        if preco_total:
+            peso_desejado = self.get_product_weight(response.url)
+            preco_pesado = self.set_weight_to_price(response.url, preco_total, peso_desejado)
 
-        produtos_ind = []
-        if preco:
-            print(f'{nome}: {preco}R$')
+            print(f'{nome}: {preco_pesado}/{peso_desejado}kg|L R$')
+
+            yield{
+                "produto": nome,
+                "preco_total": preco_pesado,
+                "quantia": peso_desejado,
+                "url_do_produto": response.url
+            }
         else:
-            print(f'{nome} está indisponível')
+            print(f'{nome}: está indisponível')
+
+            yield{
+                "produto": nome,
+                "preco_total": None,
+                "url_do_produto": response.url
+            }
+    
+    def get_product_weight(self, nome) -> str:
+        extracao = re.search(r'(arroz|feijao|oleo_de_soja|acucar|cafe)', nome.lower())
+        tipo = extracao.group(1)
+
+        peso_desejado = self.produto_volume[tipo]
+        return peso_desejado
+
+    def set_weight_to_price(self, nome, overall_price, desired_weight) -> float:
+        #extair valor do peso e unidade de medida
+        extracao = re.search(r'(\d+)(kg|g|ml|l)', nome.lower())
+        weight = float(extracao.group(1))
+        medida = extracao.group(2)
+
+        if medida == 'g' or medida == 'ml':
+            weight = weight / 1000
+
+        price_per_kg = float(overall_price) / weight
+
+        total_price = round(price_per_kg * desired_weight, 2)
+        return total_price
+        
     
 process = CrawlerProcess(settings={
     "FEEDS": {
-        "saida.json": {"format": "json"},
+        "produtos.json": {"format": "json"},
     },
 })
-process.crawl(CestaBasicaSpider)
-process.start()
 
+def init_scraper():
+    clear_previous_json()
+
+    process.crawl(CestaBasicaSpider)
+    process.start()
+
+#init_scraper()
 
 """
 -- função que utiliza oq for encontrado ná página
