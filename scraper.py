@@ -19,7 +19,7 @@ class CestaBasicaSpider(scrapy.Spider):
     custom_settings = {
         'DOWNLOAD_DELAY': 2, #média de 2 segundos de delay entre requisições
         'RANDOMIZE_DOWNLOAD_DELAY': True, # randomiza o delay
-        'CONCURRENT_REQUESTS': 1, #num. de requests consecutivas (Aumente após validar a lógica de extraçaõ)
+        'CONCURRENT_REQUESTS': 3, #num. de requests consecutivas
         'LOG_FILE': 'scrapy_output.log',
         'LOG_LEVEL': 'ERROR', #toque do Jahn para ver os prints ;)
         'HTTPCACHE_ENABLED' : True, # Usamos cache para não gerar problemas para o site do Giassi
@@ -38,13 +38,14 @@ class CestaBasicaSpider(scrapy.Spider):
 
     #pega todas as sitelists de produtos
     def parse(self, response: scrapy.http.Response):
+        print('Scraper inciado, aguarde a resposta')
         response.selector.remove_namespaces()
 
         lista_sites = response.xpath('.//sitemap/loc[contains(text(), "/product")]/text()').getall()
 
         for site in lista_sites:
-            nome_site = site.split("/")[-1]
-            print(f'Visitando site: {nome_site}')
+            # nome_site = site.split("/")[-1]
+            # print(f'Visitando site: {nome_site}')
             if site != None:
                 yield response.follow(site, self.parse_site)
 
@@ -57,19 +58,18 @@ class CestaBasicaSpider(scrapy.Spider):
 
             for p in lista_produtos:
                 if p != None:
-                    site_produto = p
-                    print(f'Visitando produto -> {site_produto}')
+                    # site_produto = p
+                    # print(f'Visitando produto -> {site_produto}')
                     yield response.follow(p, self.get_product_info)
                 else:
-                    print(f'{produto} não foi encontrado')
+                    # print(f'{produto} não foi encontrado')
+                    continue
 
     #pega nome, preço, peso, etc dos produtos encotrados
     def get_product_info(self, response: scrapy.http.Response):
         response.selector.remove_namespaces()
 
         # Dentro de get_product_info, após obter nome e preço:
-        
-                
         nome = response.css('span.vtex-store-components-3-x-productBrand::text').get()
         preco_total = response.xpath('//meta[contains(@property, "product:price:amount")]/@content').get()
         
@@ -77,7 +77,7 @@ class CestaBasicaSpider(scrapy.Spider):
             peso_desejado = self.get_product_weight(response.url)
             preco_pesado = self.set_weight_to_price(response.url, preco_total, peso_desejado)
 
-            print(f'{nome}: {preco_pesado}/{peso_desejado}kg|L R$')
+            # print(f'{nome}: {preco_pesado}/{peso_desejado}kg|L R$')
 
             yield{
                 "produto": nome,
@@ -86,7 +86,7 @@ class CestaBasicaSpider(scrapy.Spider):
                 "url_do_produto": response.url
             }
         else:
-            print(f'{nome}: está indisponível')
+            # print(f'{nome}: está indisponível')
 
             yield{
                 "produto": nome,
@@ -141,7 +141,9 @@ def init_scraper():
     process.crawl(CestaBasicaSpider)
     process.start()
 
-init_scraper()
+    print('processo do scraper finalizado')
+
+# init_scraper()
 
 """
 -- função que utiliza oq for encontrado ná página

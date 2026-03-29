@@ -112,25 +112,24 @@ def popular_categorias():
 # ---------------------------------------------------------------------------
 # Ponto de entrada
 # ---------------------------------------------------------------------------
-if __name__ == "__main__":
+def iniciar_banco():
     criar_banco()
     popular_categorias()
 
-def inserir(tabela_escolhida, informacao:list[dict]):
-    tabela = []
+if __name__ == "__main__":
+    iniciar_banco()
 
+def inserir(tabela_escolhida, informacao: list[dict]):
     match tabela_escolhida:
-        case 'tabela_ipca':
+        case 'ipca':
             tabela = tabela_ipca
-    
+        case 'tabela_categoria':
+            tabela = tabela_categoria
+        case 'tabela_produto':
+            tabela = tabela_produto
+        case _:
+            raise ValueError("Tabela não reconhecida")
+
     with engine.begin() as bd:
-        for d in informacao:
-            bd.execute(tabela.insert().values(data = d['data'], valor = d['valor']))
-    
-    atualizar_db()
+        bd.execute(tabela.insert(), informacao)
 
-def atualizar_db():
-    df = pd.read_sql("SELECT * FROM ipca", engine)
-
-
-    df.to_excel('cesta_basica.xlsx', index=False)
