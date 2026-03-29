@@ -10,7 +10,8 @@ def clear_previous_json():
 #CONFIGURANDO O SCRAPPER ------------------------------------------------
 class CestaBasicaSpider(scrapy.Spider):
     name = "cesta_basica"
-    produto_volume = {'arroz':5, 'feijao':2, 'oleo_de_soja':0.9, 'acucar':1, 'cafe':0.5}
+    produto_volume = {'arroz':5, 'feijao':2, 'oleo_de_soja':0.9, 'acucar':1, 'cafe':0.5, 'macarrão':1,
+                      'farinha_de_milho':0.5, 'farinha_de_mandioca':0.5, 'sal_':1}
     start_urls = [
         #lista de urls do site do giassi
         "https://www.giassi.com.br/sitemap.xml",
@@ -41,7 +42,7 @@ class CestaBasicaSpider(scrapy.Spider):
 
         lista_sites = response.xpath('.//sitemap/loc[contains(text(), "/product")]/text()').getall()
 
-        for site in lista_sites[:1]:
+        for site in lista_sites:
             nome_site = site.split("/")[-1]
             print(f'Visitando site: {nome_site}')
             if site != None:
@@ -66,6 +67,9 @@ class CestaBasicaSpider(scrapy.Spider):
     def get_product_info(self, response: scrapy.http.Response):
         response.selector.remove_namespaces()
 
+        # Dentro de get_product_info, após obter nome e preço:
+        
+                
         nome = response.css('span.vtex-store-components-3-x-productBrand::text').get()
         preco_total = response.xpath('//meta[contains(@property, "product:price:amount")]/@content').get()
         
@@ -89,6 +93,19 @@ class CestaBasicaSpider(scrapy.Spider):
                 "preco_total": None,
                 "url_do_produto": response.url
             }
+
+        marca = response.css('div.vtex-store-components-3-x-productBrandContainer span::text').get()
+        if not marca:
+            # fallback: tentar extrair do nome
+            marca = "Genérica"
+
+        # Extrair a quantidade real da embalagem (ex: "1kg", "500g", "900ml")
+        embalagem_texto = response.xpath('//div[contains(@class,"productSpecification")]//span[contains(text(),"Peso")]/following-sibling::span/text()').get()
+        if not embalagem_texto:
+            # tenta extrair do título
+            match = re.search(r'(\d+)(kg|g|ml|l)', nome.lower())
+            if match:
+                embalagem_texto = match.group(1)
     
     def get_product_weight(self, nome) -> str:
         extracao = re.search(r'(arroz|feijao|oleo_de_soja|acucar|cafe)', nome.lower())
@@ -124,7 +141,7 @@ def init_scraper():
     process.crawl(CestaBasicaSpider)
     process.start()
 
-#init_scraper()
+init_scraper()
 
 """
 -- função que utiliza oq for encontrado ná página
@@ -142,4 +159,5 @@ def parse(self, response: scrapy.http.Response):
         if url is not None: -- caso o item não for nulo
             -- yield adiciona uma ação a lista de ações a serem feitas enquanto o código corre
             -- respons.follow(qual url seguir, função pra tratar a resposta dessa nova url)
-            yield response.follow(url, self.parse_details)"""
+            yield response.follow(url, self.parse_details)
+"""
